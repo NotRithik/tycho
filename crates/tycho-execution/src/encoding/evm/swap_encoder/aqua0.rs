@@ -88,9 +88,9 @@ impl SwapEncoder for Aqua0SwapEncoder {
                     .map_err(|error| EncodingError::FatalError(error.to_string()))
             })
         })??;
-        if signed_quote.base_token != swap.token_in().address
-            || signed_quote.quote_token != swap.token_out().address
-            || signed_quote.amount_in != amount_in
+        if signed_quote.base_token != swap.token_in().address ||
+            signed_quote.quote_token != swap.token_out().address ||
+            signed_quote.amount_in != amount_in
         {
             return Err(EncodingError::FatalError(
                 "Aqua0 binding quote does not match the encoded swap".into(),

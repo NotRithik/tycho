@@ -73,8 +73,8 @@ fn build_callback_data(request: &EncodeRequest) -> Result<EncodeResponse, String
     if request.expected_amount_out == BigUint::ZERO {
         return Err("expectedAmountOut must be positive".into());
     }
-    if request.min_amount_out == BigUint::ZERO
-        || request.min_amount_out > request.expected_amount_out
+    if request.min_amount_out == BigUint::ZERO ||
+        request.min_amount_out > request.expected_amount_out
     {
         return Err("minAmountOut must be positive and no greater than expectedAmountOut".into());
     }

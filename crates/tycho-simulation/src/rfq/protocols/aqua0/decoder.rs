@@ -91,7 +91,11 @@ impl TryFromWithBlock<ComponentWithState, TimestampHeader> for Aqua0State {
             Duration::from_secs(5),
         )
         .map_err(|error| InvalidSnapshotError::ValueError(error.to_string()))?;
-        if client.component_id().map_err(|error| InvalidSnapshotError::ValueError(error.to_string()))? != state.component_id {
+        if client
+            .component_id()
+            .map_err(|error| InvalidSnapshotError::ValueError(error.to_string()))? !=
+            state.component_id
+        {
             return Err(InvalidSnapshotError::ValueError("Aqua0 market identity mismatch".into()));
         }
 

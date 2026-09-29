@@ -137,19 +137,22 @@ impl TychoEncoder for TychoRouterEncoder {
         }
 
         let swaps = solution.swaps();
-        let aqua0_count = swaps.iter()
+        let aqua0_count = swaps
+            .iter()
             .filter(|swap| swap.component().protocol_system == "rfq:aqua0")
             .count();
         if aqua0_count != 0 {
             let first = &swaps[0];
             // A group-local check cannot detect Aqua0 following a different protocol. Reject
             // unsupported routes before encoding any group can reserve backing or sign a quote.
-            if aqua0_count != 1
-                || first.component().protocol_system != "rfq:aqua0"
-                || swaps.iter().any(|swap| swap.split() != 0.0)
-                || &first.token_in().address != solution.token_in()
-                || first.estimated_amount_in().as_ref() != Some(solution.amount_in())
-                || solution.amount_in() == &BigUint::ZERO
+            if aqua0_count != 1 ||
+                first.component().protocol_system != "rfq:aqua0" ||
+                swaps
+                    .iter()
+                    .any(|swap| swap.split() != 0.0) ||
+                &first.token_in().address != solution.token_in() ||
+                first.estimated_amount_in().as_ref() != Some(solution.amount_in()) ||
+                solution.amount_in() == &BigUint::ZERO
             {
                 return Err(EncodingError::InvalidInput(
                     "Aqua0 requires one first-hop swap in an unsplit route, with its exact input equal to the solution input".into(),
@@ -275,34 +278,45 @@ mod tests {
         let swap = |protocol: &str, input: Bytes, output: Bytes, amount: u32| {
             Swap::new(
                 ProtocolComponent { protocol_system: protocol.into(), ..Default::default() },
-                default_token(input), default_token(output), BigUint::ZERO,
-            ).with_estimated_amount_in(amount.into())
+                default_token(input),
+                default_token(output),
+                BigUint::ZERO,
+            )
+            .with_estimated_amount_in(amount.into())
         };
-        let solution = |swaps| Solution::new(
-            Bytes::default(), Bytes::default(), weth(), usdc(),
-            100u32.into(), 100u32.into(), 90u32.into(), swaps,
-        );
+        let solution = |swaps| {
+            Solution::new(
+                Bytes::default(),
+                Bytes::default(),
+                weth(),
+                usdc(),
+                100u32.into(),
+                100u32.into(),
+                90u32.into(),
+                swaps,
+            )
+        };
         // Aqua0 starts its own encoder group, so a group-local first-hop check accepts this.
-        let later_hop = vec![
-            swap("uniswap_v2", weth(), dai(), 100),
-            swap("rfq:aqua0", dai(), usdc(), 100),
-        ];
-        let two_legs = vec![
-            swap("rfq:aqua0", weth(), dai(), 100),
-            swap("rfq:aqua0", dai(), usdc(), 100),
-        ];
+        let later_hop =
+            vec![swap("uniswap_v2", weth(), dai(), 100), swap("rfq:aqua0", dai(), usdc(), 100)];
+        let two_legs =
+            vec![swap("rfq:aqua0", weth(), dai(), 100), swap("rfq:aqua0", dai(), usdc(), 100)];
         let wrong_amount = vec![swap("rfq:aqua0", weth(), usdc(), 99)];
         let split = vec![swap("rfq:aqua0", weth(), usdc(), 100).with_split(0.5)];
         for swaps in [later_hop, two_legs, wrong_amount, split] {
-            let error = encoder.encode_solutions(vec![solution(swaps)]).unwrap_err();
+            let error = encoder
+                .encode_solutions(vec![solution(swaps)])
+                .unwrap_err();
             assert!(matches!(error, EncodingError::InvalidInput(ref message)
                 if message.contains("Aqua0 requires one first-hop swap")));
         }
         // The valid path passes validation without requiring an RFQ response for this test.
-        assert!(encoder.validate_solution(&solution(vec![
-            swap("rfq:aqua0", weth(), dai(), 100),
-            swap("uniswap_v2", dai(), usdc(), 100),
-        ])).is_ok());
+        assert!(encoder
+            .validate_solution(&solution(vec![
+                swap("rfq:aqua0", weth(), dai(), 100),
+                swap("uniswap_v2", dai(), usdc(), 100),
+            ]))
+            .is_ok());
     }
 
     mod router_encoder {

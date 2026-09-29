@@ -47,6 +47,9 @@ unused; callers must handle errors and `429` responses, not retry in a tight loo
 
 ## API and identity
 
+- `GET /chains`: supported execution chains and the backend's configured routers.
+- `GET /markets?chainId=8453`: eligible pool/class pairs from Aqua0's existing marketplace and
+  indexed strategist consent. Listing is not a promise of available depth; read state to price it.
 - `GET /state`: query `chainId`, `poolId`, `classId`, `amount0Samples`, `amount1Samples`. Amount
   samples are comma-separated decimal integers. Returns expiring levels in both directions,
   selected ranges, and a state version. Existing holds are subtracted by the backend's shared

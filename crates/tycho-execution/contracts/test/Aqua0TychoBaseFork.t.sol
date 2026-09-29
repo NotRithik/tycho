@@ -90,7 +90,7 @@ contract Aqua0TychoBaseForkTest is Test {
     IPoolManager internal constant BASE_POOL_MANAGER =
         IPoolManager(0x498581fF718922c3f8e6A244956aF099B2652b2b);
     TychoRouterV3 internal constant BASE_TYCHO_ROUTER =
-        TychoRouterV3(payable(0x9bA632d83e9eF57571256Cf4cc951b8aF1158e9C));
+        TychoRouterV3(payable(0xAbA5B53b03eAfaD1C5fc8BD5Fc765fC85Bb3de67));
     UniswapV4Executor internal constant BASE_TYCHO_V4_EXECUTOR =
         UniswapV4Executor(0x78db9684220541601E9215bB16b219e5DF6cF0fb);
     uint160 internal constant SQRT_PRICE_1_1 = 1 << 96;
@@ -104,7 +104,7 @@ contract Aqua0TychoBaseForkTest is Test {
     function setUp() public {
         vm.createSelectFork(
             vm.envOr("BASE_RPC_URL", string("https://mainnet.base.org")),
-            50_550_000
+            51_963_803
         );
         assertGt(
             address(BASE_POOL_MANAGER).code.length,
@@ -313,9 +313,9 @@ contract Aqua0TychoBaseForkTest is Test {
     uint256 internal constant V3_AMOUNT_OUT = 900_000_000_000;
     int24 internal constant V3_TICK_SPACING = 37;
 
-    /// @dev These four tests exercise the real deployed V3 reactor and Aqua0 filler on a local
-    ///      mainnet fork. The orders in test/assets are signed test fixtures generated with
-    ///      uniswapx-sdk 3.1.1. No live transaction is broadcast.
+    /// @dev These four tests retain the older, deployed filler/router pairs as historical plumbing
+    ///      checks. They do not prove migration to the current router or execute an Aqua0 hook.
+    ///      Orders in test/assets are signed fixtures from uniswapx-sdk 3.1.1. No live broadcast.
     function testFork_BaseV3ReactorExecutesDeployedAqua0Filler() public {
         _proveRealV3(
             V3ForkConfig({

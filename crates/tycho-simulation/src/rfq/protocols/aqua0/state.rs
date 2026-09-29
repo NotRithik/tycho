@@ -157,8 +157,8 @@ impl ProtocolSim for Aqua0State {
         let (amount_in, amount_out) = &points[0];
         let input_human = amount_in
             .to_f64()
-            .ok_or_else(|| SimulationError::FatalError("Aqua0 amountIn does not fit f64".into()))?
-            / 10f64.powi(input.decimals as i32);
+            .ok_or_else(|| SimulationError::FatalError("Aqua0 amountIn does not fit f64".into()))? /
+            10f64.powi(input.decimals as i32);
         let output_human = amount_out.to_f64().ok_or_else(|| {
             SimulationError::FatalError("Aqua0 amountOut does not fit f64".into())
         })? / 10f64.powi(output.decimals as i32);
@@ -221,9 +221,9 @@ impl ProtocolSim for Aqua0State {
             .as_any()
             .downcast_ref::<Aqua0State>()
             .is_some_and(|other| {
-                self.token0 == other.token0
-                    && self.token1 == other.token1
-                    && self.state_version == other.state_version
+                self.token0 == other.token0 &&
+                    self.token1 == other.token1 &&
+                    self.state_version == other.state_version
             })
     }
 

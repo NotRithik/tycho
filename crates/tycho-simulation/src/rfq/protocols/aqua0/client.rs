@@ -6,8 +6,8 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use async_trait::async_trait;
 use alloy_primitives::keccak256;
+use async_trait::async_trait;
 use futures::stream::BoxStream;
 use num_bigint::BigUint;
 use reqwest::Client;
@@ -39,7 +39,8 @@ pub struct Aqua0Client {
 
 impl fmt::Debug for Aqua0Client {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.debug_struct("Aqua0Client")
+        formatter
+            .debug_struct("Aqua0Client")
             .field("chain", &self.chain)
             .field("market", &self.market)
             .finish_non_exhaustive()
@@ -49,7 +50,6 @@ impl fmt::Debug for Aqua0Client {
 impl Aqua0Client {
     pub const PROTOCOL_SYSTEM: &'static str = "rfq:aqua0";
 
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         chain: Chain,
         base_url: String,
@@ -103,10 +103,15 @@ impl Aqua0Client {
     pub fn component_id(&self) -> Result<String, RFQError> {
         let class_id = BigUint::from_str(&self.market.class_id)
             .map_err(|_| RFQError::InvalidInput("Invalid Aqua0 class ID".into()))?;
-        Ok(format!("{:#x}", keccak256(format!(
-            "aqua0-rfq-v1:{}:{}:{}",
-            self.chain.id(), self.market.pool_id.to_lowercase(), class_id
-        ))))
+        Ok(format!(
+            "{:#x}",
+            keccak256(format!(
+                "aqua0-rfq-v1:{}:{}:{}",
+                self.chain.id(),
+                self.market.pool_id.to_lowercase(),
+                class_id
+            ))
+        ))
     }
 
     async fn response_text(response: reqwest::Response, seam: &str) -> Result<String, RFQError> {
@@ -137,18 +142,21 @@ impl Aqua0Client {
         let body = Self::response_text(response, "state request").await?;
         let state: Aqua0StateResponse = serde_json::from_str(&body)
             .map_err(|error| RFQError::ParsingError(format!("Invalid Aqua0 state: {error}")))?;
-        if state.chain_id != self.chain.id()
-            || !state.pool_id.eq_ignore_ascii_case(&self.market.pool_id)
-            || state.component_id != self.component_id()?
-            || BigUint::from_str(&state.class_id).ok() != BigUint::from_str(&self.market.class_id).ok()
+        if state.chain_id != self.chain.id() ||
+            !state
+                .pool_id
+                .eq_ignore_ascii_case(&self.market.pool_id) ||
+            state.component_id != self.component_id()? ||
+            BigUint::from_str(&state.class_id).ok() !=
+                BigUint::from_str(&self.market.class_id).ok()
         {
             return Err(RFQError::FatalError(
                 "Aqua0 state identity does not match the configured market".into(),
             ));
         }
-        if state.schema_version != "aqua0-rfq-state-v1"
-            || state.protocol_system != Self::PROTOCOL_SYSTEM
-            || state.protocol_type_name != "aqua0_jit_pool"
+        if state.schema_version != "aqua0-rfq-state-v1" ||
+            state.protocol_system != Self::PROTOCOL_SYSTEM ||
+            state.protocol_type_name != "aqua0_jit_pool"
         {
             return Err(RFQError::FatalError(
                 "Aqua0 state uses an unsupported schema or protocol identity".into(),
@@ -183,11 +191,11 @@ impl Aqua0Client {
         };
 
         let response = AQUA0_HTTP_CLIENT
-                .post(format!("{}/quote", self.base_url))
-                .timeout(self.quote_timeout)
-                .json(&request)
-                .send()
-                .await?;
+            .post(format!("{}/quote", self.base_url))
+            .timeout(self.quote_timeout)
+            .json(&request)
+            .send()
+            .await?;
         let body = Self::response_text(response, "binding quote").await?;
         let quote: Aqua0QuoteResponse = serde_json::from_str(&body)
             .map_err(|error| RFQError::ParsingError(format!("Invalid Aqua0 quote: {error}")))?;
@@ -203,25 +211,25 @@ impl Aqua0Client {
             .map_err(|error| RFQError::FatalError(error.to_string()))?
             .as_secs();
 
-        if quote.schema_version != "aqua0-rfq-quote-v1"
-            || quote.request_id != request_id
-            || quote.component_id != component_id
-            || quote.chain_id != self.chain.id()
-            || quote.token_in.to_lowercase()
-                != params
+        if quote.schema_version != "aqua0-rfq-quote-v1" ||
+            quote.request_id != request_id ||
+            quote.component_id != component_id ||
+            quote.chain_id != self.chain.id() ||
+            quote.token_in.to_lowercase() !=
+                params
                     .token_in
                     .to_string()
-                    .to_lowercase()
-            || quote.token_out.to_lowercase()
-                != params
+                    .to_lowercase() ||
+            quote.token_out.to_lowercase() !=
+                params
                     .token_out
                     .to_string()
-                    .to_lowercase()
-            || quote.amount_in != params.amount_in.to_string()
-            || quote.router.to_lowercase() != params.sender.to_string().to_lowercase()
-            || quote.executor.to_lowercase() != params.sender.to_string().to_lowercase()
-            || amount_out == BigUint::default()
-            || deadline <= now
+                    .to_lowercase() ||
+            quote.amount_in != params.amount_in.to_string() ||
+            quote.router.to_lowercase() != params.sender.to_string().to_lowercase() ||
+            quote.executor.to_lowercase() != params.sender.to_string().to_lowercase() ||
+            amount_out == BigUint::default() ||
+            deadline <= now
         {
             return Err(RFQError::FatalError(
                 "Aqua0 binding quote does not match the requested swap and Tycho router".into(),
@@ -354,7 +362,11 @@ impl RFQClient for Aqua0Client {
 
 #[cfg(test)]
 mod tests {
-    use std::{io::{Read, Write}, net::TcpListener};
+    use std::{
+        io::{Read, Write},
+        net::TcpListener,
+    };
+
     use super::*;
 
     #[tokio::test]
@@ -363,23 +375,35 @@ mod tests {
         let url = format!("http://{}", listener.local_addr().unwrap());
         let server = std::thread::spawn(move || {
             let (mut socket, _) = listener.accept().unwrap();
-            socket.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
             let mut request = Vec::new();
             let (header_end, body_len) = loop {
                 let mut bytes = [0; 4096];
                 let n = socket.read(&mut bytes).unwrap();
                 assert!(n > 0);
                 request.extend_from_slice(&bytes[..n]);
-                if let Some(end) = request.windows(4).position(|b| b == b"\r\n\r\n") {
+                if let Some(end) = request
+                    .windows(4)
+                    .position(|b| b == b"\r\n\r\n")
+                {
                     let headers = String::from_utf8_lossy(&request[..end]).to_lowercase();
                     assert!(headers.starts_with("post /quote "));
                     assert!(!headers.contains("x-api-key") && !headers.contains("x-operator-key"));
-                    let len = headers.lines().find_map(|line| line.strip_prefix("content-length: "))
-                        .unwrap().parse::<usize>().unwrap();
-                    if request.len() >= end + 4 + len { break (end + 4, len); }
+                    let len = headers
+                        .lines()
+                        .find_map(|line| line.strip_prefix("content-length: "))
+                        .unwrap()
+                        .parse::<usize>()
+                        .unwrap();
+                    if request.len() >= end + 4 + len {
+                        break (end + 4, len);
+                    }
                 }
             };
-            let body: serde_json::Value = serde_json::from_slice(&request[header_end..header_end + body_len]).unwrap();
+            let body: serde_json::Value =
+                serde_json::from_slice(&request[header_end..header_end + body_len]).unwrap();
             let response = serde_json::json!({
                 "schemaVersion": "aqua0-rfq-quote-v1", "requestId": body["requestId"],
                 "componentId": body["componentId"], "chainId": 8453,
@@ -388,18 +412,33 @@ mod tests {
                 "router": body["expectedRouter"], "executor": body["expectedRouter"],
                 "hookData": "0xdeadbeef", "swapId": format!("0x{}", "22".repeat(32)),
                 "nonce": "1", "deadline": "4102444800", "ranges": [],
-            }).to_string();
+            })
+            .to_string();
             write!(socket, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", response.len(), response).unwrap();
         });
-        let client = Aqua0Client::new(Chain::Base, url, Aqua0Market {
-            pool_id: format!("0x{}", "11".repeat(32)), class_id: "001".into(),
-            amount0_samples: vec!["100".into()], amount1_samples: vec!["100".into()],
-        }, Duration::from_secs(5), Duration::from_secs(5)).unwrap();
+        let client = Aqua0Client::new(
+            Chain::Base,
+            url,
+            Aqua0Market {
+                pool_id: format!("0x{}", "11".repeat(32)),
+                class_id: "001".into(),
+                amount0_samples: vec!["100".into()],
+                amount1_samples: vec!["100".into()],
+            },
+            Duration::from_secs(5),
+            Duration::from_secs(5),
+        )
+        .unwrap();
         let params = GetAmountOutParams {
-            amount_in: 100u32.into(), token_in: Bytes::zero(20), token_out: Bytes::from(vec![1; 20]),
-            sender: Bytes::from(vec![2; 20]), receiver: Bytes::from(vec![2; 20]),
+            amount_in: 100u32.into(),
+            token_in: Bytes::zero(20),
+            token_out: Bytes::from(vec![1; 20]),
+            sender: Bytes::from(vec![2; 20]),
+            receiver: Bytes::from(vec![2; 20]),
         };
-        let result = client.fetch_binding_quote(&params).await;
+        let result = client
+            .fetch_binding_quote(&params)
+            .await;
         server.join().unwrap();
         assert_eq!(result.unwrap().amount_out, "200");
     }

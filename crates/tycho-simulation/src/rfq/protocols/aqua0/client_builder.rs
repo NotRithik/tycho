@@ -35,12 +35,6 @@ impl Aqua0ClientBuilder {
     }
 
     pub fn build(self) -> Result<Aqua0Client, RFQError> {
-        Aqua0Client::new(
-            self.chain,
-            self.base_url,
-            self.market,
-            self.poll_time,
-            self.quote_timeout,
-        )
+        Aqua0Client::new(self.chain, self.base_url, self.market, self.poll_time, self.quote_timeout)
     }
 }

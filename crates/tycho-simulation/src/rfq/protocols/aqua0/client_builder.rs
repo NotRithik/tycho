@@ -9,8 +9,6 @@ pub struct Aqua0ClientBuilder {
     chain: Chain,
     base_url: String,
     market: Aqua0Market,
-    api_key: String,
-    operator_key: String,
     poll_time: Duration,
     quote_timeout: Duration,
 }
@@ -21,17 +19,9 @@ impl Aqua0ClientBuilder {
             chain,
             base_url,
             market,
-            api_key: String::new(),
-            operator_key: String::new(),
             poll_time: Duration::from_secs(5),
             quote_timeout: Duration::from_secs(5),
         }
-    }
-
-    pub fn credentials(mut self, api_key: String, operator_key: String) -> Self {
-        self.api_key = api_key;
-        self.operator_key = operator_key;
-        self
     }
 
     pub fn poll_time(mut self, poll_time: Duration) -> Self {
@@ -49,8 +39,6 @@ impl Aqua0ClientBuilder {
             self.chain,
             self.base_url,
             self.market,
-            self.api_key,
-            self.operator_key,
             self.poll_time,
             self.quote_timeout,
         )

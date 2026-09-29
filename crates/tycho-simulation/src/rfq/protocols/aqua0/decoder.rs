@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, str::FromStr, time::Duration};
+use std::{collections::HashMap, str::FromStr, time::Duration};
 
 use tycho_client::feed::synchronizer::ComponentWithState;
 use tycho_common::{models::token::Token, Bytes};
@@ -82,16 +82,18 @@ impl TryFromWithBlock<ComponentWithState, TimestampHeader> for Aqua0State {
                 .map(str::to_string)
                 .collect(),
         };
+        // Aqua0 quotes and approvals are keyless. LP beta credentials are not solver credentials.
         let client = Aqua0Client::new(
             snapshot.component.chain,
             text_attribute(static_attributes, "api_url")?,
             market,
-            env::var("AQUA0_RFQ_API_KEY").unwrap_or_default(),
-            env::var("AQUA0_RFQ_OPERATOR_KEY").unwrap_or_default(),
             Duration::from_secs(5),
             Duration::from_secs(5),
         )
         .map_err(|error| InvalidSnapshotError::ValueError(error.to_string()))?;
+        if client.component_id().map_err(|error| InvalidSnapshotError::ValueError(error.to_string()))? != state.component_id {
+            return Err(InvalidSnapshotError::ValueError("Aqua0 market identity mismatch".into()));
+        }
 
         // Validate that all on-chain identity fields are valid hex before accepting the snapshot.
         Bytes::from_str(&state.pool_id).map_err(|error| {

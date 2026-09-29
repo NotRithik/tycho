@@ -294,8 +294,6 @@ mod tests {
                 Chain::Base,
                 "http://localhost/api/tycho/rfq".into(),
                 market,
-                "read".into(),
-                "operator".into(),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
             )

@@ -41,8 +41,8 @@ impl SwapEncoder for Aqua0SwapEncoder {
         swap: &Swap,
         encoding_context: &EncodingContext,
     ) -> Result<Vec<u8>, EncodingError> {
-        // A later sequential hop receives the previous venue's dynamic output. Aqua0 signs an exact
-        // amountSpecified, so that amount is unknowable at encoding time and must be refused.
+        // This only checks position within a group. TychoRouterEncoder validates the whole route
+        // before any quote request, including input amounts and the single-Aqua0-leg restriction.
         if encoding_context.group_token_in != swap.token_in().address {
             return Err(EncodingError::FatalError(
                 "Aqua0 must be the first swap because its JIT authorization binds exact input"
@@ -120,6 +120,10 @@ impl SwapEncoder for Aqua0SwapEncoder {
 
     fn executor_address(&self) -> &Bytes {
         &self.executor_address
+    }
+
+    fn blocks_on_quote(&self) -> bool {
+        true
     }
 
     fn clone_box(&self) -> Box<dyn SwapEncoder> {

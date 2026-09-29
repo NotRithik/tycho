@@ -41,11 +41,10 @@ for any protocol indexed by Tycho.
   auto-detection), and opt-in auto-detection additionally serves unknown venues under their
   address (`pricelevelstream:{0xaddress}`). Precedence: between `add_pamm` and `deny_pamm` for
   the same address the later call wins; `with_known_pamms` defaults never override either,
-  regardless of call order. `build` emits venues on Titan's PropAMMRouter whitelist under
-  `propammfallback:{pamm}` instead, so tycho-execution routes their swaps through the router
-  (Uniswap V3 fallback on venue revert); it reads that whitelist once on the first poll via
-  `RPC_URL`, and warns and stays on the direct path without it. `without_fallback_router` skips
-  the read and keeps every venue on the direct path. Venues may overlap with other integration
+  regardless of call order. By default `build` emits every venue under `fallback:{pamm}`, so
+  tycho-execution routes their swaps through `TychoFallbackRouter` (retry on a solver-named
+  fallback pool when the venue reverts); `without_fallback_router` keeps every venue on the
+  direct `pricelevelstream:` path. Venues may overlap with other integration
   paths of the same liquidity (e.g. `vm:fermiswap`) — consumers must deduplicate by venue where
   double-counting matters
 
@@ -63,6 +62,25 @@ fallback for protocols too complex to port, not a default.
 3. **VM** — Solidity adapter in `revm`; works for any EVM protocol but is slower and requires an
    adapter contract in `protocols/adapter-integration/`. Use only when native is not feasible.
 4. **RFQ** — off-chain quotes via API; for protocols that cannot be simulated on-chain at all.
+
+## Pending-block state for hybrid/VM protocols
+
+`apply_deltas_ephemeral` applies only `state_deltas`; nothing on the pending path writes to the
+VM database, so `apply_deltas_ephemeral` can't read the pending state from there. A protocol
+whose `delta_transition` re-reads the VM would therefore quote a pending block against confirmed
+state. Fluid and Curve close that gap the same way:
+
+1. A `TxDeltaIndexer` implementation — which lives in the consuming repo, not here — builds
+   `evm::simulation::PendingOverrides` (storage, native balances and block environment) from the
+   accounts a `PendingBlock` carries.
+2. It reads the protocol's state under those overrides (`fluid::call_resolver`,
+   `curve::read_pool_readings`) and puts the result in a state-delta attribute
+   (`pool_reserves_adjusted`, `pool_state_adjusted`).
+3. `delta_transition` branches on that attribute and rebuilds from it, falling back to the VM read
+   when it is absent.
+
+Reading under the pending block's own number and timestamp matters: anything with on-chain time
+math (Fluid's expanding limits, Curve's ramping `A()`) is wrong under the parent block's clock.
 
 ## Features
 

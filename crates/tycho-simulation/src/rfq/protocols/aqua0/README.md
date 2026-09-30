@@ -92,7 +92,33 @@ would miss Aqua0 appearing after a different protocol. The encoder marks itself 
 quote so it follows Tycho's RFQ scheduling path, then delegates byte packing to
 `UniswapV4SwapEncoder`.
 
+## Future intermediate-hop support
+
+First-hop-only is the current integration policy, not an inherent V4 restriction. The current
+Aqua0 hook binds an exact input. A later hop can execute only if the earlier hops deliver that
+exact amount; even one raw unit of difference reverts the transaction. Do not advertise ordinary
+intermediate-slippage support by removing the encoder guard alone.
+
+Keep signed `hookData` opaque to Tycho. A future backend and hook can change their internal
+authorization format without putting Aqua0's signature types or signer keys into Tycho. Changing
+the backend alone cannot change what an already deployed hook verifies.
+
+Before enabling later hops or split routes, expose versioned per-market execution capabilities
+in the RFQ API, have the client reject unknown versions, and update the whole-route validator to
+honor only capabilities both the hook and client support. Price and reserve the full authorized
+input range, retain direction/pool/router/expiry/nonce/range binding, and explicitly handle
+unused approvals from legitimate reverted transactions. A change to API fields or amount
+semantics requires a coordinated client update, even when the opaque bytes still pass through.
+Prove a real predecessor swap followed by Aqua0, amount drift, insufficient backing and replay
+on a fork before enabling a new capability. None of this future behavior is enabled by this PR.
+
 ## Verification
+
+`query_pool_swap` reports the advertised capacity when its execution price clears the caller's
+trade-price limit. A finite RFQ curve need not reach the AMM search's slippage target before it
+ends. Treating that boundary as an error causes solver depth estimation to discard usable Aqua0
+liquidity. Pool-target-price queries are unsupported: RFQ samples are independent quotes, not a
+post-trade marginal pool state.
 
 ```bash
 cargo test -p tycho-simulation rfq::protocols::aqua0 --lib

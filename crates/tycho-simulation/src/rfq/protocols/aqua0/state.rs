@@ -16,7 +16,10 @@ use tycho_common::{
     simulation::{
         errors::{SimulationError, TransitionError},
         indicatively_priced::{IndicativelyPriced, SignedQuote},
-        protocol_sim::{Balances, GetAmountOutResult, ProtocolSim},
+        protocol_sim::{
+            Balances, GetAmountOutResult, PoolSwap, ProtocolSim, QueryPoolSwapParams,
+            SwapConstraint,
+        },
     },
     Bytes,
 };
@@ -193,6 +196,56 @@ impl ProtocolSim for Aqua0State {
             .ok_or_else(|| SimulationError::RecoverableError("No Aqua0 liquidity".into()))
     }
 
+    fn query_pool_swap(&self, params: &QueryPoolSwapParams) -> Result<PoolSwap, SimulationError> {
+        self.ensure_fresh()?;
+        let SwapConstraint::TradeLimitPrice { limit, min_amount_in, max_amount_in, .. } =
+            params.swap_constraint()
+        else {
+            // Independent RFQ samples do not describe a post-trade marginal pool price.
+            return Err(SimulationError::InvalidInput(
+                "Aqua0 supports trade-price limits, not pool-price targets".into(),
+                None,
+            ));
+        };
+        let (capacity, _) =
+            self.get_limits(params.token_in().address.clone(), params.token_out().address.clone())?;
+        let maximum = max_amount_in
+            .as_ref()
+            .map_or(capacity.clone(), |bound| capacity.min(bound.clone()));
+        let minimum = min_amount_in
+            .clone()
+            .unwrap_or_default();
+        if minimum > maximum || limit.denominator == BigUint::default() {
+            return Err(SimulationError::InvalidInput("Invalid Aqua0 trade bounds".into(), None));
+        }
+        let quote =
+            |amount: BigUint| self.get_amount_out(amount, params.token_in(), params.token_out());
+        let clears = |amount: &BigUint, output: &BigUint| {
+            output * &limit.denominator >= amount * &limit.numerator
+        };
+        let result = quote(maximum.clone())?;
+        // RFQ liquidity ends at the last backed sample. Unlike an AMM, it need not reach
+        // the requested slippage before that boundary. Return the usable capacity directly.
+        if clears(&maximum, &result.amount) {
+            return Ok(PoolSwap::new(maximum, result.amount, result.new_state, None));
+        }
+        let candidate = crate::evm::query_pool_swap::query_pool_swap(self, params)?;
+        let amount = candidate
+            .amount_in()
+            .clone()
+            .min(maximum);
+        let result = quote(amount.clone())?;
+        // The generic floating-point search has a tolerance; never return a quote below
+        // the exact integer price limit or outside the caller's amount bounds.
+        if amount < minimum || !clears(&amount, &result.amount) {
+            return Err(SimulationError::InvalidInput(
+                "No Aqua0 trade satisfies the requested bounds".into(),
+                None,
+            ));
+        }
+        Ok(PoolSwap::new(amount, result.amount, result.new_state, None))
+    }
+
     fn delta_transition(
         &mut self,
         _delta: ProtocolStateDelta,
@@ -327,5 +380,35 @@ mod tests {
             state.get_amount_out(BigUint::from(100u32), &state.token0, &state.token1),
             Err(SimulationError::RecoverableError(_))
         ));
+    }
+
+    #[test]
+    fn trade_depth_is_capped_by_backed_liquidity_and_caller_bounds() {
+        use tycho_common::simulation::protocol_sim::Price;
+        let state = state();
+        for (minimum, maximum, expected) in [
+            (None, None, Some(200u32)),
+            (None, Some(150u32), Some(150)),
+            (Some(151u32), Some(150), None),
+        ] {
+            let params = QueryPoolSwapParams::new(
+                state.token0.clone(),
+                state.token1.clone(),
+                SwapConstraint::TradeLimitPrice {
+                    limit: Price::new(2u32.into(), 1u32.into()),
+                    tolerance: 0.001,
+                    min_amount_in: minimum.map(BigUint::from),
+                    max_amount_in: maximum.map(BigUint::from),
+                },
+            );
+            let result = state.query_pool_swap(&params);
+            if let Some(expected) = expected {
+                let result = result.unwrap();
+                assert_eq!(result.amount_in(), &BigUint::from(expected));
+                assert!(result.amount_out() >= &(result.amount_in() * 2u32));
+            } else {
+                assert!(result.is_err());
+            }
+        }
     }
 }
